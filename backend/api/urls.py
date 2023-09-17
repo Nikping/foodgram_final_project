@@ -1,26 +1,51 @@
 from django.urls import include, path
 from rest_framework import routers
 
-from .views import TagViewSet, RecipeWiewSet, ShoppingCartMixin,\
-     FavoriteMixin, IngredientMixin
+from api.views import (
+    CustomUserViewSet,
+    FollowListViewSet,
+    FollowDestroyCreateViewSet,
+    TagListRetrieveViewSet,
+    IngredientViewSet,
+    RecipeViewSet,
+    FavoriteDestroyCreateViewSet,
+    ShoppingCartDestroyCreateViewSet
+)
 
+app_name = 'api'
 
-router_v1 = routers.DefaultRouter()
-router_v1.register('tags', TagViewSet)
-router_v1.register('recipes', RecipeWiewSet)
-router_v1.register(
+router = routers.DefaultRouter()
+router.register(
+    r'users/(?P<user_id>\d+)/subscribe',
+    FollowDestroyCreateViewSet,
+    basename='subscribe'
+)
+router.register(
+    'users/subscriptions',
+    FollowListViewSet,
+    basename='subscriptions'
+)
+router.register('users', CustomUserViewSet)
+router.register('tags', TagListRetrieveViewSet)
+router.register('recipes', RecipeViewSet)
+router.register(
     r'recipes/(?P<recipe_id>\d+)/shopping_cart',
-    ShoppingCartMixin,
-    basename='shopping_cart')
-router_v1.register(
+    ShoppingCartDestroyCreateViewSet,
+    basename='shopping_cart'
+)
+router.register(
     r'recipes/(?P<recipe_id>\d+)/favorite',
-    FavoriteMixin,
-    basename='favorite')
-router_v1.register(
+    FavoriteDestroyCreateViewSet,
+    basename='favorite'
+)
+router.register(
     'ingredients',
-    IngredientMixin,
-    basename='ingredients')
+    IngredientViewSet,
+    basename='ingredients'
+)
+
 
 urlpatterns = [
-    path('', include(router_v1.urls)),
+    path('auth/', include('djoser.urls.authtoken')),
+    path('', include(router.urls)),
 ]

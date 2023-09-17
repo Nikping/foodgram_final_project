@@ -2,7 +2,7 @@ from django_filters import rest_framework
 from rest_framework.filters import SearchFilter
 import django_filters
 
-from .models import Recipe, Tag, Ingredient
+from recipes.models import Recipe, Tag, Ingredient
 
 
 class IngredientFilter(SearchFilter):
@@ -31,7 +31,7 @@ class MyFilterSet(rest_framework.FilterSet):
 
     def filter_shopping_cart(self, qs, name, value):
         if value == 1:
-            return qs.filter(shopping_list__user=self.request.user)
+            return qs.filter(shopping_cart__user=self.request.user)
 
     def filter_is_favorited(self, qs, name, value):
         if value == 1:

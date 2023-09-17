@@ -1,31 +1,88 @@
+from datetime import datetime
 from django.db.models import Sum
 from django.http.response import HttpResponse
-from rest_framework import mixins, viewsets
-from rest_framework.response import Response
-from rest_framework import status
 from django.shortcuts import get_object_or_404
-from rest_framework import serializers
-from django.contrib.auth import get_user_model
-from rest_framework import filters
 from django_filters.rest_framework import DjangoFilterBackend
+from djoser.views import UserViewSet
+from rest_framework import (
+    filters,
+    serializers,
+    mixins,
+    status,
+    permissions,
+    viewsets
+)
 from rest_framework.decorators import action
-from rest_framework import permissions
+from rest_framework.response import Response
 
-from .models import Tag, Recipe, ShoppingCart, Favorite, Ingredient,\
+from api.filters import MyFilterSet, IngredientFilter
+from api.pagination import CustomPagination
+from api.permissions import IsAuthorOrReadOnly
+from api.serializers import (
+    RecipeCreateSerializer,
+    ShoppingCartSerializer,
+    FavoriteSerializer,
+    IngredientSerializer,
+    TegSerializer,
+    RecipeReadSerializer,
+    FollowSerializer
+)
+from recipes.models import (
+    Tag,
+    Recipe,
+    ShoppingCart,
+    Favorite,
+    Ingredient,
     IngredientToRecipe
-from .serializers import (
-    RecipeCreateSerializer, ShoppingCartSerializer,
-    FavoriteSerializer, IngredientSerializer, TegSerializer,
-    RecipeReadSerializer)
-from .permissions import AuthorIsRequestUserPermission
-from .filters import MyFilterSet, IngredientFilter
-from .pagination import CustomPagination
-
-User = get_user_model()
+)
+from users.models import User, Follow
 
 
-class IngredientMixin(viewsets.ReadOnlyModelViewSet):
-    """Отображение одного ингредиента или списка"""
+class CustomUserViewSet(UserViewSet):
+    """Пользовательский view-класс."""
+
+    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        return User.objects.all()
+
+
+class FollowListViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """View-класс для отображения списка модели Follow."""
+
+    serializer_class = FollowSerializer
+    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        return User.objects.filter(following__user=self.request.user)
+
+
+class FollowDestroyCreateViewSet(
+    mixins.DestroyModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet
+):
+    """View-класс для создания и удаления модели Follow."""
+
+    serializer_class = FollowSerializer
+    queryset = User.objects.all()
+
+    def delete(self, request, *args, **kwargs):
+        user_id = self.kwargs['user_id']
+        author = get_object_or_404(User, pk=user_id)
+        instance = Follow.objects.filter(
+            user=request.user, author=author
+        )
+        if not instance:
+            raise serializers.ValidationError(
+                'Вы ещё не оформили подписку на этого пользователя!'
+            )
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
+    """View-класс для отображения ингредиента или списка ингредиентов."""
 
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
@@ -34,12 +91,12 @@ class IngredientMixin(viewsets.ReadOnlyModelViewSet):
     search_fields = ('^name', )
 
 
-class ShoppingCartMixin(
+class ShoppingCartDestroyCreateViewSet(
     mixins.DestroyModelMixin,
     mixins.CreateModelMixin,
     viewsets.GenericViewSet
 ):
-    """Создание и удаление объекта списка покупок"""
+    """View-класс для cоздания и удаления объекта ShoppingCart."""
 
     queryset = Recipe.objects.all()
     serializer_class = ShoppingCartSerializer
@@ -48,24 +105,23 @@ class ShoppingCartMixin(
     def delete(self, request, *args, **kwargs):
         recipe_id = self.kwargs.get('recipe_id')
         recipe = get_object_or_404(Recipe, pk=recipe_id)
-
         instance = ShoppingCart.objects.filter(
-            user=request.user, recipe=recipe)
-
+            user=request.user, recipe=recipe
+        )
         if not instance:
             raise serializers.ValidationError(
-                'В корзине нет данного товара'
+                'В корзине нет такого списка продуктов!'
             )
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class FavoriteMixin(
+class FavoriteDestroyCreateViewSet(
     mixins.DestroyModelMixin,
     mixins.CreateModelMixin,
     viewsets.GenericViewSet
 ):
-    """Создание и удаление объекта избранного"""
+    """View-класс для создания и удаления объекта Favorite."""
 
     queryset = Recipe.objects.all()
     serializer_class = FavoriteSerializer
@@ -74,33 +130,32 @@ class FavoriteMixin(
     def delete(self, request, *args, **kwargs):
         recipe_id = self.kwargs.get('recipe_id')
         recipe = get_object_or_404(Recipe, pk=recipe_id)
-
         instance = Favorite.objects.filter(
-            user=request.user, recipe=recipe)
-
+            user=request.user, recipe=recipe
+        )
         if not instance:
             raise serializers.ValidationError(
-                'В корзине нет данного товара'
+                'В избранном нет такого рецепта!'
             )
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class TagViewSet(
+class TagListRetrieveViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet
 ):
-    """Отображение одного тега или списка"""
+    """View-класс для отображения одного тегов или списка тегов"""
 
     queryset = Tag.objects.all()
     serializer_class = TegSerializer
 
 
-class RecipeWiewSet(viewsets.ModelViewSet):
-    """Отображение и создание рецептов"""
+class RecipeViewSet(viewsets.ModelViewSet):
+    """View-класс для отображения и создания рецептов."""
 
-    permission_classes = (AuthorIsRequestUserPermission, )
+    permission_classes = (IsAuthorOrReadOnly, )
     queryset = Recipe.objects.all()
     serializer_class = RecipeCreateSerializer
     filter_class = MyFilterSet
@@ -111,30 +166,27 @@ class RecipeWiewSet(viewsets.ModelViewSet):
             return RecipeReadSerializer
         return RecipeCreateSerializer
 
-    @staticmethod
-    def send_message(ingredients):
-        """
-        Посылает сообщение дублирующее скачиваемый список
-        """
-        shopping_list = 'Купить в магазине:'
-        for ingredient in ingredients:
-            shopping_list += (
-                f"\n{ingredient['ingredient__name']} "
-                f"({ingredient['ingredient__measurement_unit']}) - "
-                f"{ingredient['amount']}")
-        file = 'shopping_list.txt'
-        response = HttpResponse(shopping_list, content_type='text/plain')
-        response['Content-Disposition'] = f'attachment; filename="{file}.txt"'
-        return response
-
     @action(detail=False, methods=['GET'])
     def download_shopping_cart(self, request):
-        """
-        Скачивает список покупок
-        """
+        """Скачивание товаров из корзины."""
         ingredients = IngredientToRecipe.objects.filter(
-            recipe__shopping_list__user=request.user
+            recipe__shopping_cart__user=request.user
         ).order_by('ingredient__name').values(
             'ingredient__name', 'ingredient__measurement_unit'
         ).annotate(amount=Sum('amount'))
-        return self.send_message(ingredients)
+        today = datetime.today()
+        shopping_cart = (
+            f'Сегодня {today.day}/{today.month}/{today.year}\n'
+            f'В магазине необходимо купить:\n'
+        )
+        for ingredient in ingredients:
+            shopping_cart += (
+                f"\n - {ingredient['ingredient__name']} "
+                f"({ingredient['ingredient__measurement_unit']})"
+                f" - {ingredient['amount']}")
+        shopping_cart += f'\n\n by FoodgramCollection {today.year}'
+        filename = f'{request.user.username}_shopping_list.txt'
+        response = HttpResponse(shopping_cart, content_type='text/plain')
+        response['Content-Disposition'] = \
+            f'attachment; filename="{filename}.txt"'
+        return response
