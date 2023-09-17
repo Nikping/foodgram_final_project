@@ -240,12 +240,10 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
             'cooking_time',
         )
 
-    def validate(self, data):
+    def validate_tags(self, data):
         request = self.context.get('request', None)
         tags_list = []
-        ingredients_list = []
         request_methods = ['POST', 'PATCH']
-
         if request.method in request_methods:
             if 'tags' in data:
                 tags = data['tags']
@@ -257,13 +255,20 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
                     tags_list.append(tag.id)
                 if len(tags_list) == 0:
                     raise serializers.ValidationError(
-                            'Должен присутствовать хотя бы 1 тег!'
-                        )
+                        'Должен присутствовать хотя бы 1 тег!'
+                    )
                 all_tags = Tag.objects.all().values_list('id', flat=True)
                 if not set(tags_list).issubset(all_tags):
                     raise serializers.ValidationError(
                         f'Тега {tag} не существует!'
                     )
+        return data
+
+    def validate_ingredients(self, data):
+        request = self.context.get('request', None)
+        ingredients_list = []
+        request_methods = ['POST', 'PATCH']
+        if request.method in request_methods:
             if 'ingredienttorecipe' in data:
                 ingredients = data['ingredienttorecipe']
                 for ingredient in ingredients:
@@ -282,8 +287,8 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
                     )
                 if len(ingredients_list) == 0:
                     raise serializers.ValidationError(
-                            'Список ингредиентов не должен быть пустым'
-                        )
+                        'Список ингредиентов не должен быть пустым'
+                    )
         return data
 
     @staticmethod
@@ -320,8 +325,8 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         return RecipeReadSerializer(instance, context={
-                 'request': self.context.get('request')
-            }).data
+            'request': self.context.get('request')
+        }).data
 
 
 class FollowSerializer(CustomUserSerializer):
