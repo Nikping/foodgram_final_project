@@ -166,7 +166,8 @@ class RecipeReadSerializer(serializers.ModelSerializer):
     tags = serializers.SerializerMethodField()
     ingredients = IngredientToRecipeSerializer(
         many=True,
-        source='ingredienttorecipe')
+        source='ingredienttorecipe'
+    )
     author = CustomUserSerializer(read_only=True)
     image = Base64ImageField()
     is_favorited = serializers.SerializerMethodField()
@@ -223,10 +224,12 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
 
     tags = serializers.PrimaryKeyRelatedField(
         queryset=Tag.objects.all(),
-        many=True)
+        many=True
+    )
     ingredients = IngredientToRecipeSerializer(
         many=True,
-        source='ingredienttorecipe')
+        source='ingredienttorecipe'
+    )
     image = Base64ImageField()
 
     class Meta:
@@ -283,11 +286,11 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
                 )
                 if not set(ingredients_list).issubset(all_ingredients):
                     raise serializers.ValidationError(
-                        'Указанного ингредиента не существует'
+                        'Указанного ингредиента не существует!'
                     )
                 if len(ingredients_list) == 0:
                     raise serializers.ValidationError(
-                        'Список ингредиентов не должен быть пустым'
+                        'Список ингредиентов не должен быть пустым!'
                     )
         return data
 
